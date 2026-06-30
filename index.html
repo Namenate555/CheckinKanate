@@ -843,9 +843,10 @@ function showToast(msg) {
 function sendCheckin(id, name, lat, lng, status, time, subj, date) {
   var url = localStorage.getItem('scriptUrl');
   if (!url) return;
+  // ไม่ใส่ header Content-Type เพื่อเลี่ยง CORS preflight ที่ Apps Script ไม่รองรับ
+  // Apps Script รับ JSON string ได้ตามปกติผ่าน e.postData.contents
   fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type':'application/json' },
     body: JSON.stringify({
       action:'checkin',
       sheetId:  localStorage.getItem('sheetId')  || '',
@@ -869,7 +870,6 @@ function exportToSheet() {
   showToast('กำลังบันทึก...');
   fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type':'application/json' },
     body: JSON.stringify({
       action:'exportAll',
       sheetId:  localStorage.getItem('sheetId')  || '',
