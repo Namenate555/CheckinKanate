@@ -879,8 +879,8 @@ function loadConfig() {
     localStorage.setItem('sheetId',   'https://docs.google.com/spreadsheets/d/1FzICgPMxrcoO78LKY4sVxPhzg4TamMLAFghybQ4MtE8/edit?gid=0#gid=0');
     localStorage.setItem('sheetTab',  'เช็คชื่อ');
   }
-  document.getElementById('scriptUrl').value = localStorage.getItem('scriptUrl') || '';
-  document.getElementById('sheetId').value   = localStorage.getItem('sheetId')   || '';
+  document.getElementById('scriptUrl').value = localStorage.getItem('scriptUrl') || 'https://script.google.com/a/macros/go.buu.ac.th/s/AKfycbymMMsA_KfQxvbgymH4lm4Woz4AxTGrWBmbHgb-uHEqpY01hJpCJgnu6eupxDI_ryod/exec';
+  document.getElementById('sheetId').value   = localStorage.getItem('sheetId')   || 'https://docs.google.com/spreadsheets/d/1FzICgPMxrcoO78LKY4sVxPhzg4TamMLAFghybQ4MtE8/edit?gid=0#gid=0';
   document.getElementById('sheetTab').value  = localStorage.getItem('sheetTab')  || 'เช็คชื่อ';
 }
 
