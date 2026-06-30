@@ -373,6 +373,7 @@ tr:last-child td { border-bottom:none; }
 var tLat = null, tLng = null;
 var sessionToken = null;
 var timerInt = null;
+var pollInt = null;
 var checkins = [];        // [{id, name, lat, lng, time, fp}]
 var sLat = null, sLng = null;
 var qrLoaded = false;
@@ -482,16 +483,50 @@ function startSession() {
   document.getElementById('startBtn').style.display  = 'none';
   drawQR();
   startTimer(expire * 60);
+  startPolling();
   showToast('Session เริ่มแล้ว!');
 }
 
 function stopSession() {
   clearInterval(timerInt);
+  clearInterval(pollInt);
   document.getElementById('sdot').className    = 'dot off';
   document.getElementById('sbtxt').textContent = 'Session หยุดแล้ว';
   document.getElementById('stopBtn').style.display  = 'none';
   document.getElementById('startBtn').style.display = '';
   showToast('Session หยุดแล้ว');
+}
+
+function startPolling() {
+  clearInterval(pollInt);
+  fetchLiveResults();
+  pollInt = setInterval(fetchLiveResults, 5000);
+}
+
+function fetchLiveResults() {
+  var url = localStorage.getItem('scriptUrl');
+  var sheetId = localStorage.getItem('sheetId');
+  if (!url || !sheetId) return; // ยังไม่ตั้งค่า Google Sheets — ใช้ได้แค่ตารางในเครื่อง
+  var sheetTab = localStorage.getItem('sheetTab') || 'เช็คชื่อ';
+  var date = sessionDateStr || document.getElementById('sessionDate').value;
+  var q = url + '?action=list&sheetId=' + encodeURIComponent(sheetId) +
+          '&sheetTab=' + encodeURIComponent(sheetTab) + '&date=' + encodeURIComponent(date);
+  fetch(q)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data || !data.rows) return;
+      checkins = data.rows.map(function(r) {
+        var loc = (r.loc || '').split(',');
+        return {
+          id: r.stdId, name: r.name,
+          lat: loc[0] ? parseFloat(loc[0]) : null,
+          lng: loc[1] ? parseFloat(loc[1]) : null,
+          time: r.time, fp: ''
+        };
+      });
+      renderTable();
+    })
+    .catch(function() { /* เงียบไว้ ไม่รบกวนผู้ใช้ถ้าดึงไม่ได้ชั่วคราว */ });
 }
 
 function startTimer(sec) {
@@ -876,11 +911,11 @@ function saveConfig() {
 function loadConfig() {
   if (!localStorage.getItem('scriptUrl')) {
     localStorage.setItem('scriptUrl', 'https://script.google.com/a/macros/go.buu.ac.th/s/AKfycbymMMsA_KfQxvbgymH4lm4Woz4AxTGrWBmbHgb-uHEqpY01hJpCJgnu6eupxDI_ryod/exec');
-    localStorage.setItem('sheetId',   'https://docs.google.com/spreadsheets/d/1FzICgPMxrcoO78LKY4sVxPhzg4TamMLAFghybQ4MtE8/edit?gid=0#gid=0');
+    localStorage.setItem('sheetId',   'https://docs.google.com/spreadsheets/d/1FzICgPMxrcoO78LKY4sVxPhzg4TamMLAFghybQ4MtE8/');
     localStorage.setItem('sheetTab',  'เช็คชื่อ');
   }
   document.getElementById('scriptUrl').value = localStorage.getItem('scriptUrl') || 'https://script.google.com/a/macros/go.buu.ac.th/s/AKfycbymMMsA_KfQxvbgymH4lm4Woz4AxTGrWBmbHgb-uHEqpY01hJpCJgnu6eupxDI_ryod/exec';
-  document.getElementById('sheetId').value   = localStorage.getItem('sheetId')   || 'https://docs.google.com/spreadsheets/d/1FzICgPMxrcoO78LKY4sVxPhzg4TamMLAFghybQ4MtE8/edit?gid=0#gid=0';
+  document.getElementById('sheetId').value   = localStorage.getItem('sheetId')   || 'https://docs.google.com/spreadsheets/d/1FzICgPMxrcoO78LKY4sVxPhzg4TamMLAFghybQ4MtE8/';
   document.getElementById('sheetTab').value  = localStorage.getItem('sheetTab')  || 'เช็คชื่อ';
 }
 
@@ -944,7 +979,42 @@ function setupCodeBox() {
     '    .setMimeType(ContentService.MimeType.TEXT);',
     '}',
     '',
+    '// GET — ใช้สำหรับ ping (ทดสอบเชื่อมต่อ) และ list (ดึงผลเช็คชื่อสด)',
     'function doGet(e) {',
+    '  var action = e.parameter.action;',
+    '',
+    '  if (action === \'ping\') {',
+    '    return ContentService',
+    '      .createTextOutput(\'ok\')',
+    '      .setMimeType(ContentService.MimeType.TEXT);',
+    '  }',
+    '',
+    '  if (action === \'list\') {',
+    '    var sheetId  = e.parameter.sheetId;',
+    '    var sheetTab = e.parameter.sheetTab;',
+    '    var date     = e.parameter.date;',
+    '    var ss    = SpreadsheetApp.openById(sheetId);',
+    '    var tab   = sheetTab + \'_\' + date;',
+    '    var sheet = ss.getSheetByName(tab);',
+    '    var rows  = [];',
+    '    if (sheet) {',
+    '      var vals = sheet.getDataRange().getValues();',
+    '      for (var i = 1; i < vals.length; i++) {',
+    '        if (!vals[i][1]) continue;',
+    '        rows.push({',
+    '          stdId:  vals[i][1],',
+    '          name:   vals[i][2],',
+    '          loc:    vals[i][5],',
+    '          status: vals[i][6],',
+    '          time:   vals[i][7]',
+    '        });',
+    '      }',
+    '    }',
+    '    return ContentService',
+    '      .createTextOutput(JSON.stringify({ rows: rows }))',
+    '      .setMimeType(ContentService.MimeType.JSON);',
+    '  }',
+    '',
     '  return ContentService',
     '    .createTextOutput(\'ok\')',
     '    .setMimeType(ContentService.MimeType.TEXT);',
