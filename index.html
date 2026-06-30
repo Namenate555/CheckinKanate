@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>ระบบเช็คชื่อ GPS</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --blue:#185FA5; --blue-dk:#0C447C; --blue-lt:#E6F1FB; --blue-bd:#B5D4F4;
+  --teal:#0F6E56; --teal-dk:#085041; --teal-lt:#E1F5EE; --teal-bd:#9FE1CB; --teal-dot:#1D9E75;
+  --red:#A32D2D; --red-lt:#FCEBEB; --red-bd:#F7C1C1;
+  --green-lt:#EAF3DE; --green-dk:#27500A;
+  --amber-lt:#FAEEDA; --amber-dk:#633806; --amber-bd:#FAC775;
+  --gray:#5F5E5A; --gray-lt:#F1EFE8; --gray-bd:#D3D1C7; --gray-dk:#444441; --gray-dot:#888780;
+  --txt:#1a1a1a; --txt2:#5F5E5A;
+  --bg:#fff; --bg2:#F1EFE8; --bg3:#f8f7f5; --bdr:rgba(0,0,0,.12);
+  --r8:8px; --r12:12px;
+}
+@media (prefers-color-scheme:dark) {
+  :root { --txt:#f0ede8; --txt2:#B4B2A9; --bg:#1c1b18; --bg2:#2a2926; --bg3:#232220; --bdr:rgba(255,255,255,.12); }
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'Sarabun',sans-serif; background:var(--bg3); color:var(--txt); min-height:100vh; }
+a { color:var(--blue); }
+
+/* NAV */
+nav { background:var(--bg); border-bottom:.5px solid var(--bdr); padding:0 1.25rem; display:flex; align-items:center; height:52px; position:sticky; top:0; z-index:100; gap:.5rem; }
+.brand { font-size:16px; font-weight:500; color:var(--blue-dk); white-space:nowrap; }
+.tabs { display:flex; gap:3px; margin-left:auto; }
+.tab { padding:5px 12px; border-radius:var(--r8); border:none; background:none; color:var(--txt2); font-size:13px; font-family:inherit; cursor:pointer; white-space:nowrap; }
+.tab:hover { background:var(--bg2); }
+.tab.on { background:var(--blue-lt); color:var(--blue-dk); font-weight:500; }
+
+/* LAYOUT */
+.page { display:none; padding:1.25rem; max-width:860px; margin:0 auto; }
+.page.on { display:block; }
+.narrow { max-width:480px; margin:0 auto; }
+
+/* CARD */
+.card { background:var(--bg); border:.5px solid var(--bdr); border-radius:var(--r12); padding:1.25rem; margin-bottom:.875rem; }
+.ctitle { font-size:14px; font-weight:600; margin-bottom:.875rem; display:flex; align-items:center; gap:6px; }
+
+/* FORM */
+label { font-size:12px; color:var(--txt2); display:block; margin-bottom:3px; margin-top:10px; }
+label:first-of-type { margin-top:0; }
+input[type=text], input[type=number], input[type=password] {
+  width:100%; padding:8px 11px; border:.5px solid var(--bdr); border-radius:var(--r8);
+  font-size:14px; font-family:inherit; background:var(--bg); color:var(--txt); transition:border-color .15s;
+}
+input:focus { outline:none; border-color:var(--blue); }
+input[readonly] { color:var(--txt2); background:var(--bg2); }
+.g2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+@media (max-width:520px) { .g2 { grid-template-columns:1fr; } }
+
+/* BUTTON */
+.btn { display:inline-flex; align-items:center; justify-content:center; gap:5px; padding:8px 16px; border-radius:var(--r8); border:.5px solid var(--bdr); background:var(--bg); color:var(--txt); font-size:13px; font-family:inherit; cursor:pointer; font-weight:500; transition:background .15s; white-space:nowrap; }
+.btn:hover { background:var(--bg2); }
+.btn:active { opacity:.85; }
+.btn-blue { background:var(--blue); color:#fff; border-color:var(--blue); }
+.btn-blue:hover { background:var(--blue-dk); }
+.btn-teal { background:var(--teal); color:#fff; border-color:var(--teal); }
+.btn-teal:hover { background:var(--teal-dk); }
+.btn-red { background:var(--red); color:#fff; border-color:var(--red); }
+.btn-lg { padding:12px 20px; font-size:15px; width:100%; }
+.bgrp { display:flex; gap:8px; flex-wrap:wrap; margin-top:.875rem; }
+
+/* QR */
+.qrzone { text-align:center; padding:.75rem 0; }
+#qrWrap { display:inline-block; padding:12px; background:#fff; border-radius:var(--r12); border:.5px solid var(--bdr); }
+.timer { font-size:30px; font-weight:600; color:var(--blue-dk); margin-top:.625rem; }
+.timersub { font-size:12px; color:var(--txt2); margin-top:2px; }
+.sbadge { display:inline-flex; align-items:center; gap:6px; padding:3px 12px; border-radius:20px; font-size:12px; background:var(--teal-lt); color:var(--teal-dk); border:.5px solid var(--teal-bd); margin-top:.625rem; }
+.dot { width:7px; height:7px; border-radius:50%; background:var(--teal-dot); animation:pulse 1.5s infinite; flex-shrink:0; }
+.dot.off { background:var(--gray-dot); animation:none; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+
+/* STATS */
+.statrow { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:.875rem; }
+@media (max-width:400px) { .statrow { grid-template-columns:repeat(2,1fr); } }
+.scard { background:var(--bg2); border-radius:var(--r8); padding:.625rem .75rem; text-align:center; }
+.snum { font-size:22px; font-weight:600; }
+.slbl { font-size:11px; color:var(--txt2); margin-top:1px; }
+
+/* TABLE */
+.tbwrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+table { width:100%; border-collapse:collapse; font-size:12px; }
+th { font-size:11px; font-weight:600; color:var(--txt2); text-align:left; padding:7px 8px; border-bottom:.5px solid var(--bdr); white-space:nowrap; }
+td { padding:7px 8px; border-bottom:.5px solid var(--bdr); }
+tr:last-child td { border-bottom:none; }
+.bp { display:inline-flex; padding:1px 8px; border-radius:10px; font-size:11px; font-weight:600; background:var(--green-lt); color:var(--green-dk); }
+.ba { display:inline-flex; padding:1px 8px; border-radius:10px; font-size:11px; font-weight:600; background:var(--red-lt); color:var(--red); }
+
+/* GPS STATUS */
+.gps { display:flex; align-items:flex-start; gap:8px; padding:10px 12px; border-radius:var(--r8); font-size:13px; margin:.625rem 0; line-height:1.5; }
+.gps.ok   { background:var(--teal-lt); color:var(--teal-dk); border:.5px solid var(--teal-bd); }
+.gps.fail { background:var(--red-lt);  color:var(--red);     border:.5px solid var(--red-bd); }
+.gps.chk  { background:var(--amber-lt);color:var(--amber-dk);border:.5px solid var(--amber-bd); }
+
+/* ALERT */
+.al { padding:10px 14px; border-radius:var(--r8); font-size:13px; line-height:1.6; margin:.625rem 0; }
+.al-i { background:var(--blue-lt);  color:var(--blue-dk);  border:.5px solid var(--blue-bd); }
+.al-w { background:var(--amber-lt); color:var(--amber-dk); border:.5px solid var(--amber-bd); }
+.al-d { background:var(--red-lt);   color:var(--red);      border:.5px solid var(--red-bd); }
+.al-s { background:var(--teal-lt);  color:var(--teal-dk);  border:.5px solid var(--teal-bd); }
+
+/* BIG RESULT */
+.bigres { text-align:center; padding:2rem 1rem 1rem; }
+.bigres .ico { font-size:56px; margin-bottom:.625rem; }
+.bigres h3 { font-size:20px; font-weight:600; }
+.bigres p { font-size:13px; color:var(--txt2); margin-top:6px; line-height:1.75; white-space:pre-line; }
+
+/* CODE */
+.codebox { background:var(--bg2); border:.5px solid var(--bdr); border-radius:var(--r8); padding:10px 12px; font-size:11.5px; word-break:break-all; color:var(--txt2); cursor:pointer; font-family:'Courier New',monospace; white-space:pre-wrap; line-height:1.6; max-height:320px; overflow-y:auto; }
+.codebox:hover { border-color:var(--blue); }
+
+/* STEPS */
+.steps { display:flex; flex-direction:column; gap:.375rem; margin:.625rem 0; }
+.step  { display:flex; align-items:flex-start; gap:8px; font-size:13px; line-height:1.55; }
+.stepn { min-width:20px; height:20px; border-radius:50%; background:var(--blue); color:#fff; font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px; }
+.mapmock { background:var(--blue-lt); border-radius:var(--r8); height:60px; display:flex; align-items:center; justify-content:center; color:var(--blue); font-size:12px; border:.5px solid var(--blue-bd); margin-top:6px; }
+.divider { border:none; border-top:.5px solid var(--bdr); margin:.875rem 0; }
+.hint { font-size:11px; color:var(--txt2); margin-top:3px; }
+
+/* TOAST */
+#toast { position:fixed; bottom:1.25rem; left:50%; transform:translateX(-50%); background:var(--gray-dk); color:#fff; padding:9px 18px; border-radius:var(--r8); font-size:13px; opacity:0; transition:opacity .2s; pointer-events:none; z-index:999; white-space:nowrap; max-width:90vw; text-align:center; }
+#toast.show { opacity:1; }
+</style>
+</head>
+<body>
+
+<nav id="mainNav">
+  <div class="brand">📍 ระบบเช็คชื่อ GPS</div>
+  <div class="tabs" id="navTabs">
+    <button class="tab on"  onclick="goPage('teacher',this)">🎓 อาจารย์</button>
+    <button class="tab"     onclick="goPage('student',this)">📱 นิสิต</button>
+  </div>
+</nav>
+<div id="toast"></div>
+
+<!-- ══════════════════════════════════════
+     TEACHER PAGE
+══════════════════════════════════════ -->
+<div id="page-teacher" class="page on">
+
+  <div class="card">
+    <div class="ctitle">📋 สร้าง Session เช็คชื่อ</div>
+    <div class="g2">
+      <div>
+        <label>วิชา</label>
+        <input type="text" id="subjectName" placeholder="เช่น จุลชีววิทยา 101">
+      </div>
+      <div>
+        <label>วันที่</label>
+        <input type="text" id="sessionDate">
+      </div>
+    </div>
+    <div class="g2">
+      <div>
+        <label>รัศมีที่อนุญาต (เมตร)</label>
+        <input type="number" id="radiusInput" value="500" min="50" max="3000">
+      </div>
+      <div>
+        <label>QR หมดอายุใน (นาที)</label>
+        <input type="number" id="expireInput" value="30" min="5" max="180">
+      </div>
+    </div>
+    <label>ตำแหน่ง GPS ห้องเรียน</label>
+    <div class="g2">
+      <input type="text" id="teacherLat" placeholder="Latitude" readonly>
+      <input type="text" id="teacherLng" placeholder="Longitude" readonly>
+    </div>
+    <div class="mapmock" id="mapMock">📍 กดปุ่มด้านล่างเพื่อรับตำแหน่ง</div>
+    <div class="bgrp">
+      <button class="btn btn-blue" onclick="getTeacherGPS()">📡 รับตำแหน่งปัจจุบัน</button>
+      <button class="btn" id="startBtn" onclick="startSession()">▶ เริ่ม Session</button>
+      <button class="btn btn-red" id="stopBtn" style="display:none" onclick="stopSession()">■ หยุด Session</button>
+    </div>
+  </div>
+
+  <!-- QR Card -->
+  <div class="card" id="qrCard" style="display:none">
+    <div class="ctitle">QR Code สำหรับนิสิต</div>
+    <div class="qrzone">
+      <div id="qrWrap"><canvas id="qrCanvas" width="200" height="200"></canvas></div>
+      <div class="timer" id="qrTimer">--:--</div>
+      <div class="timersub">เหลือเวลา</div>
+      <div class="sbadge"><div class="dot" id="sdot"></div><span id="sbtxt">Session กำลังทำงาน</span></div>
+    </div>
+    <div class="al al-i" style="margin-top:.5rem;font-size:12px">
+      💡 <strong>วิธีแชร์:</strong> ฉายหน้าจอ QR ให้นิสิตสแกนด้วยกล้องมือถือ หรือกด "บันทึกรูป QR" แล้วพิมพ์แจก
+      <br>หากเปิดจาก <strong>GitHub Pages</strong> นิสิตจะเปิดหน้าเช็คชื่อได้ทันที
+    </div>
+    <div class="bgrp">
+      <button class="btn" onclick="printQR()">🖨️ พิมพ์ QR</button>
+      <button class="btn" onclick="downloadQR()">⬇️ บันทึกรูป QR</button>
+    </div>
+  </div>
+
+  <!-- Stats Card -->
+  <div class="card" id="statsCard" style="display:none">
+    <div class="ctitle">ผลการเช็คชื่อ real-time</div>
+    <div class="statrow">
+      <div class="scard"><div class="snum" id="stTotal" style="color:var(--blue)">0</div><div class="slbl">ทั้งหมด</div></div>
+      <div class="scard"><div class="snum" id="stPresent" style="color:var(--teal)">0</div><div class="slbl">มาเรียน</div></div>
+      <div class="scard"><div class="snum" id="stAbsent" style="color:var(--red)">0</div><div class="slbl">ยังไม่เช็ค</div></div>
+      <div class="scard"><div class="snum" id="stPct" style="color:var(--blue)">0%</div><div class="slbl">% เข้าเรียน</div></div>
+    </div>
+    <div class="tbwrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>รหัสนิสิต</th>
+            <th>ชื่อ-นามสกุล</th>
+            <th>ตำแหน่ง</th>
+            <th>สถานะ</th>
+            <th>เวลา</th>
+            <th>🔒 อุปกรณ์</th>
+          </tr>
+        </thead>
+        <tbody id="atBody"><tr><td colspan="7" style="text-align:center;color:var(--txt2);padding:1rem">รอนิสิตเช็คชื่อ...</td></tr></tbody>
+      </table>
+    </div>
+    <div class="bgrp">
+      <button class="btn btn-teal" onclick="exportToSheet()">📊 บันทึก Google Sheets</button>
+      <button class="btn" onclick="exportCSV()">⬇️ Export CSV</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════════
+     STUDENT PAGE
+══════════════════════════════════════ -->
+<div id="page-student" class="page">
+  <div class="narrow">
+
+    <!-- Main form -->
+    <div id="stdMain">
+      <div style="text-align:center;padding:1.25rem 0 .5rem">
+        <div style="font-size:32px">📝</div>
+        <h2 style="font-size:19px;font-weight:600;margin-top:.375rem">เช็คชื่อเข้าเรียน</h2>
+        <div id="sessInfoBar" style="font-size:13px;color:var(--txt2);margin-top:4px">—</div>
+      </div>
+
+      <div class="card">
+        <div class="ctitle">ข้อมูลนิสิต</div>
+        <label>รหัสนิสิต *</label>
+        <input type="text" id="stdId" placeholder="กรอกรหัสนิสิต" maxlength="20">
+        <label>ชื่อ-นามสกุล *</label>
+        <input type="text" id="stdName" placeholder="กรอกชื่อ-นามสกุล">
+      </div>
+
+      <div class="card">
+        <div class="ctitle">ตรวจสอบตำแหน่ง GPS</div>
+        <div class="gps chk" id="gpsEl">
+          <span>🔄</span><span id="gpsTxt">กำลังตรวจสอบ GPS...</span>
+        </div>
+        <div id="distRow" style="font-size:13px;color:var(--txt2);padding:4px 0;display:none">
+          ระยะห่างจากห้องเรียน: <strong id="distVal">—</strong>
+        </div>
+        <div class="bgrp">
+          <button class="btn btn-blue btn-lg" onclick="studentCheckIn()">✓ เช็คชื่อ</button>
+        </div>
+        <div style="text-align:center;margin-top:.5rem">
+          <button class="btn" onclick="refreshStudentGPS()" style="font-size:12px;padding:5px 12px">🔄 รีเฟรช GPS</button>
+        </div>
+      </div>
+
+      <div class="al al-w" style="font-size:12px">
+        🔒 <strong>ป้องกันลงชื่อแทน:</strong> ระบบบันทึก fingerprint อุปกรณ์ไว้
+        1 อุปกรณ์ใช้ได้กับ 1 รหัสนิสิตต่อ session เท่านั้น
+      </div>
+    </div>
+
+    <!-- Success -->
+    <div id="stdOK" style="display:none">
+      <div class="bigres">
+        <div class="ico">✅</div>
+        <h3>เช็คชื่อสำเร็จ!</h3>
+        <p id="okMsg"></p>
+      </div>
+      <div class="al al-s" style="text-align:center;font-size:13px">
+        อุปกรณ์นี้ถูกบันทึกแล้ว ไม่สามารถเช็คชื่อซ้ำได้
+      </div>
+    </div>
+
+    <!-- Fail -->
+    <div id="stdFail" style="display:none">
+      <div class="bigres">
+        <div class="ico">❌</div>
+        <h3 id="failTitle">ไม่สามารถเช็คชื่อได้</h3>
+        <p id="failMsg"></p>
+      </div>
+      <div style="text-align:center;margin-top:.75rem">
+        <button class="btn" onclick="resetStudent()">← ลองอีกครั้ง</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     CONFIG PAGE
+══════════════════════════════════════ -->
+<div id="page-config" class="page" style="display:none !important">
+
+  <div class="card">
+    <div class="ctitle">⚙️ ตั้งค่า Google Sheets</div>
+    <div class="al al-w" style="font-size:12px">
+      แต่ละอาจารย์ตั้งค่าของตัวเองได้ที่นี่ ข้อมูลจะบันทึกลง Google Sheet ของแต่ละท่านแยกกัน
+    </div>
+    <div class="steps">
+      <div class="step"><div class="stepn">1</div><div>เปิด Google Sheet "ต้นฉบับเช็คชื่อ" → <strong>Extensions → Apps Script</strong></div></div>
+      <div class="step"><div class="stepn">2</div><div>ลบโค้ดเดิมทั้งหมด วางโค้ดด้านล่าง → กด <strong>Ctrl+S</strong></div></div>
+      <div class="step"><div class="stepn">3</div><div><strong>Deploy → New deployment → Web app</strong><br>Execute as: <strong>Me</strong> | Who has access: <strong>Anyone</strong></div></div>
+      <div class="step"><div class="stepn">4</div><div>คัดลอก <strong>Web App URL</strong> มาวางด้านล่าง แล้วกดบันทึก</div></div>
+    </div>
+
+    <hr class="divider">
+
+    <label>Apps Script Web App URL</label>
+    <input type="text" id="scriptUrl" placeholder="https://script.google.com/macros/s/.../exec">
+    <div class="hint">URL จากขั้นตอน Deploy ขึ้นต้นด้วย https://script.google.com/macros/s/</div>
+
+    <label>Google Sheet ID</label>
+    <input type="text" id="sheetId" placeholder="วางตรงนี้ — หาได้จาก URL ของ Google Sheet">
+    <div class="hint">อยู่ระหว่าง /d/ และ /edit ใน URL ของ Sheet</div>
+
+    <label>ชื่อ Sheet tab ที่มีรายชื่อนิสิต</label>
+    <input type="text" id="sheetTab" value="เช็คชื่อ">
+    <div class="hint">ชื่อ tab ที่ต้องการบันทึกผลเช็คชื่อ</div>
+
+    <div class="bgrp">
+      <button class="btn btn-blue" onclick="saveConfig()">💾 บันทึกการตั้งค่า</button>
+      <button class="btn" onclick="testScript()">🔗 ทดสอบการเชื่อมต่อ</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="ctitle">📋 โค้ด Apps Script</div>
+    <div class="hint" style="margin-bottom:.5rem">คลิกที่โค้ดเพื่อคัดลอก</div>
+    <div class="codebox" id="codeBox" onclick="copyCode()"></div>
+    <div class="bgrp">
+      <button class="btn" onclick="copyCode()">📋 คัดลอกโค้ด</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="ctitle">📤 วิธีแชร์ให้อาจารย์ท่านอื่น</div>
+    <div class="steps">
+      <div class="step"><div class="stepn">1</div><div>อาจารย์แต่ละท่านเปิดไฟล์ <strong>index.html</strong> นี้ใน Chrome</div></div>
+      <div class="step"><div class="stepn">2</div><div>ไปที่ ⚙️ ตั้งค่า แล้วใส่ Script URL และ Sheet ID ของตัวเอง</div></div>
+      <div class="step"><div class="stepn">3</div><div>กด <strong>บันทึกการตั้งค่า</strong> — ระบบจะจำค่าไว้ในเบราว์เซอร์ของแต่ละคน</div></div>
+      <div class="step"><div class="stepn">4</div><div>อัปโหลดไฟล์นี้ขึ้น <strong>GitHub Pages</strong> เพื่อให้ QR สแกนได้จากมือถือนิสิต</div></div>
+    </div>
+    <div class="al al-i" style="font-size:12px;margin-top:.5rem">
+      💡 แนะนำ: อัปโหลดไฟล์ขึ้น GitHub Pages (ฟรี) แล้วได้ URL แบบ <code>https://username.github.io/attendance/</code>
+      นิสิตสแกน QR แล้วเปิดหน้าเว็บเช็คชื่อได้ทันที
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════ -->
+<script>
+// ─────────────────────────
+// State
+// ─────────────────────────
+var tLat = null, tLng = null;
+var sessionToken = null;
+var timerInt = null;
+var checkins = [];        // [{id, name, lat, lng, time, fp}]
+var sLat = null, sLng = null;
+var qrLoaded = false;
+var sessionSubject = '';
+var sessionDateStr = '';
+
+// ─────────────────────────
+// Init
+// ─────────────────────────
+window.onload = function() {
+  document.getElementById('sessionDate').value = new Date().toLocaleDateString('th-TH');
+  loadConfig();
+  setupCodeBox();
+  refreshStudentGPS();
+
+  var params = new URLSearchParams(window.location.search);
+  var tok = params.get('token');
+  if (tok) {
+    // เปิดผ่าน QR — ซ่อน nav ทั้งหมด แสดงเฉพาะหน้าเช็คชื่อ
+    document.getElementById('navTabs').style.display = 'none';
+    document.getElementById('mainNav').style.justifyContent = 'center';
+    goPage('student', null);
+    loadSessionToken(tok);
+  } else {
+    // เปิดปกติ — แสดงหน้าอาจารย์ก่อน
+    goPage('teacher', document.querySelectorAll('.tab')[0]);
+  }
+};
+
+// ─────────────────────────
+// Navigation
+// ─────────────────────────
+function goPage(page, btn) {
+  document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('on'); });
+  document.querySelectorAll('.tab').forEach(function(t)  { t.classList.remove('on'); });
+  document.getElementById('page-' + page).classList.add('on');
+  if (btn) btn.classList.add('on');
+}
+
+// ─────────────────────────
+// Device Fingerprint
+// ─────────────────────────
+function getFingerprint() {
+  var raw = [
+    navigator.userAgent || '',
+    navigator.language  || '',
+    screen.width + 'x' + screen.height,
+    screen.colorDepth   || '',
+    new Date().getTimezoneOffset(),
+    navigator.hardwareConcurrency || '',
+    navigator.platform  || ''
+  ].join('|');
+  var h = 0;
+  for (var i = 0; i < raw.length; i++) {
+    h = (Math.imul(31, h) + raw.charCodeAt(i)) | 0;
+  }
+  return (h >>> 0).toString(16).padStart(8, '0');
+}
+
+// ─────────────────────────
+// Teacher GPS
+// ─────────────────────────
+function getTeacherGPS() {
+  if (!navigator.geolocation) { showToast('เบราว์เซอร์ไม่รองรับ GPS'); return; }
+  showToast('กำลังรับตำแหน่ง...');
+  navigator.geolocation.getCurrentPosition(
+    function(pos) {
+      tLat = pos.coords.latitude;
+      tLng = pos.coords.longitude;
+      document.getElementById('teacherLat').value = tLat.toFixed(6);
+      document.getElementById('teacherLng').value = tLng.toFixed(6);
+      document.getElementById('mapMock').textContent =
+        'Lat ' + tLat.toFixed(5) + '  |  Lng ' + tLng.toFixed(5) +
+        '  (±' + Math.round(pos.coords.accuracy) + ' ม.)';
+      showToast('รับตำแหน่งสำเร็จ!');
+    },
+    function(err) { showToast('GPS: ' + err.message); },
+    { enableHighAccuracy: true, timeout: 12000 }
+  );
+}
+
+// ─────────────────────────
+// Session
+// ─────────────────────────
+function startSession() {
+  if (!tLat || !tLng) { showToast('กรุณารับตำแหน่ง GPS ก่อน'); return; }
+  var subj   = document.getElementById('subjectName').value.trim() || 'ไม่ระบุวิชา';
+  var radius = parseInt(document.getElementById('radiusInput').value) || 500;
+  var expire = parseInt(document.getElementById('expireInput').value) || 30;
+  // เก็บไว้แสดงผลฝั่งอาจารย์ (ไม่ใส่ลงใน QR เพื่อให้ QR สั้น)
+  sessionSubject = subj;
+  sessionDateStr = document.getElementById('sessionDate').value;
+  // payload คีย์สั้น ตัวเลขล้วน + ปัดพิกัด 5 ตำแหน่ง เพื่อให้ QR เล็กลงมาก
+  // a=lat b=lng r=radius e=exp(วินาที) — ไม่มีภาษาไทยใน token เลย
+  var payload = {
+    a: Math.round(tLat * 1e5) / 1e5,
+    b: Math.round(tLng * 1e5) / 1e5,
+    r: radius,
+    e: Math.round((Date.now() + expire * 60 * 1000) / 1000)
+  };
+  sessionToken = btoa(JSON.stringify(payload));
+  checkins = [];
+  renderTable();
+  document.getElementById('qrCard').style.display    = '';
+  document.getElementById('statsCard').style.display = '';
+  document.getElementById('stopBtn').style.display   = '';
+  document.getElementById('startBtn').style.display  = 'none';
+  drawQR();
+  startTimer(expire * 60);
+  showToast('Session เริ่มแล้ว!');
+}
+
+function stopSession() {
+  clearInterval(timerInt);
+  document.getElementById('sdot').className    = 'dot off';
+  document.getElementById('sbtxt').textContent = 'Session หยุดแล้ว';
+  document.getElementById('stopBtn').style.display  = 'none';
+  document.getElementById('startBtn').style.display = '';
+  showToast('Session หยุดแล้ว');
+}
+
+function startTimer(sec) {
+  clearInterval(timerInt);
+  var rem = sec;
+  function tick() {
+    var m = String(Math.floor(rem / 60)).padStart(2, '0');
+    var s = String(rem % 60).padStart(2, '0');
+    document.getElementById('qrTimer').textContent = m + ':' + s;
+    if (rem <= 0) { clearInterval(timerInt); stopSession(); }
+    rem--;
+  }
+  tick();
+  timerInt = setInterval(tick, 1000);
+}
+
+// ─────────────────────────
+// QR Code
+// ─────────────────────────
+function drawQR() {
+  var url = window.location.href.split('?')[0] + '?token=' + encodeURIComponent(sessionToken);
+  if (window.QRCode) { doQR(url); return; }
+  var s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+  s.onload  = function() { doQR(url); };
+  s.onerror = function() { qrFallback(); };
+  document.head.appendChild(s);
+}
+
+function doQR(url) {
+  var wrap = document.getElementById('qrWrap');
+  wrap.innerHTML = '<canvas id="qrCanvas" width="200" height="200"></canvas>';
+  var tmp = document.createElement('div');
+  tmp.style.cssText = 'display:none;position:absolute';
+  document.body.appendChild(tmp);
+  try {
+    new QRCode(tmp, { text: url, width: 220, height: 220, correctLevel: QRCode.CorrectLevel.L });
+    setTimeout(function() {
+      var img = tmp.querySelector('img');
+      if (img) {
+        var c   = document.getElementById('qrCanvas');
+        var ctx = c.getContext('2d');
+        var image = new Image();
+        image.onload = function() { ctx.drawImage(image, 0, 0, 200, 200); };
+        image.src = img.src;
+      }
+      if (tmp.parentNode) tmp.parentNode.removeChild(tmp);
+    }, 400);
+  } catch(e) {
+    if (tmp.parentNode) tmp.parentNode.removeChild(tmp);
+    qrFallback();
+  }
+}
+
+function qrFallback() {
+  document.getElementById('qrWrap').innerHTML =
+    '<div style="width:200px;height:200px;display:flex;align-items:center;justify-content:center;' +
+    'text-align:center;font-size:12px;color:var(--blue);padding:1rem;line-height:1.5">' +
+    'QR โหลดไม่ได้<br>กรุณาเชื่อมต่ออินเทอร์เน็ต<br>แล้วรีเฟรชหน้าเว็บ</div>';
+}
+
+function downloadQR() {
+  var c = document.getElementById('qrCanvas');
+  if (!c) { showToast('ยังไม่มี QR'); return; }
+  var a = document.createElement('a');
+  a.download = 'qr-checkin.png';
+  a.href = c.toDataURL('image/png');
+  a.click();
+}
+
+function printQR() {
+  var c = document.getElementById('qrCanvas');
+  if (!c) { showToast('ยังไม่มี QR'); return; }
+  var subj = document.getElementById('subjectName').value || '';
+  var date = document.getElementById('sessionDate').value || '';
+  var w = window.open('', '_blank');
+  w.document.write(
+    '<html><body style="text-align:center;font-family:sans-serif;padding:2rem">' +
+    '<h2 style="margin-bottom:.25rem">เช็คชื่อเข้าเรียน</h2>' +
+    '<p style="margin-bottom:.25rem;font-size:16px">' + subj + '</p>' +
+    '<p style="color:#666;font-size:14px">' + date + '</p>' +
+    '<img src="' + c.toDataURL() + '" style="width:260px;height:260px;margin:1rem 0;display:block;margin-left:auto;margin-right:auto">' +
+    '<p style="font-size:13px;color:#888">สแกนด้วยกล้องมือถือ แล้วกรอกข้อมูลเพื่อเช็คชื่อ</p>' +
+    '</body></html>'
+  );
+  w.document.close();
+  w.print();
+}
+
+// ─────────────────────────
+// Attendance Table
+// ─────────────────────────
+function renderTable() {
+  var tbody = document.getElementById('atBody');
+  if (checkins.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--txt2);padding:1rem">รอนิสิตเช็คชื่อ...</td></tr>';
+    document.getElementById('stTotal').textContent   = '0';
+    document.getElementById('stPresent').textContent = '0';
+    document.getElementById('stAbsent').textContent  = '0';
+    document.getElementById('stPct').textContent     = '0%';
+    return;
+  }
+  var rows = '';
+  for (var i = 0; i < checkins.length; i++) {
+    var c   = checkins[i];
+    var loc = c.lat ? c.lat.toFixed(4) + ', ' + c.lng.toFixed(4) : '-';
+    var fp  = c.fp ? '<span style="font-size:11px;color:var(--teal)">#' + c.fp + '</span>' : '-';
+    rows += '<tr>' +
+      '<td>' + (i+1) + '</td>' +
+      '<td>' + esc(c.id) + '</td>' +
+      '<td>' + esc(c.name) + '</td>' +
+      '<td style="font-size:11px;color:var(--txt2)">' + loc + '</td>' +
+      '<td><span class="bp">✓ Present</span></td>' +
+      '<td>' + c.time + '</td>' +
+      '<td>' + fp + '</td>' +
+    '</tr>';
+  }
+  tbody.innerHTML = rows;
+  document.getElementById('stTotal').textContent   = checkins.length;
+  document.getElementById('stPresent').textContent = checkins.length;
+  document.getElementById('stAbsent').textContent  = '0';
+  document.getElementById('stPct').textContent     = '100%';
+}
+
+function esc(str) {
+  return String(str || '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+// ─────────────────────────
+// Student Side
+// ─────────────────────────
+function refreshStudentGPS() {
+  var el  = document.getElementById('gpsEl');
+  var txt = document.getElementById('gpsTxt');
+  el.className = 'gps chk';
+  txt.textContent = 'กำลังตรวจสอบ GPS...';
+  if (!navigator.geolocation) {
+    el.className = 'gps fail';
+    txt.textContent = 'เบราว์เซอร์ไม่รองรับ GPS';
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    function(pos) {
+      sLat = pos.coords.latitude;
+      sLng = pos.coords.longitude;
+      el.className = 'gps ok';
+      txt.textContent = 'GPS พร้อม (±' + Math.round(pos.coords.accuracy) + ' ม.)';
+      updateDistDisplay();
+    },
+    function(err) {
+      el.className = 'gps fail';
+      txt.textContent = 'ไม่สามารถรับ GPS: ' + err.message;
+    },
+    { enableHighAccuracy: true, timeout: 12000 }
+  );
+}
+
+function decodeToken(tok) {
+  // token เป็น base64 ของ JSON ตัวเลขล้วน — แปลงเป็นรูปแบบเดิมให้โค้ดที่เหลือใช้ง่าย
+  var p = JSON.parse(atob(tok));
+  return { lat: p.a, lng: p.b, radius: p.r, exp: p.e * 1000 };
+}
+
+function updateDistDisplay() {
+  if (!sessionToken || !sLat) return;
+  try {
+    var sess = decodeToken(sessionToken);
+    var d = calcDist(sLat, sLng, sess.lat, sess.lng);
+    document.getElementById('distRow').style.display = '';
+    document.getElementById('distVal').textContent   = Math.round(d) + ' เมตร';
+  } catch(e) {}
+}
+
+function loadSessionToken(tok) {
+  try {
+    sessionToken = tok;
+    var sess = decodeToken(tok);
+    document.getElementById('sessInfoBar').textContent =
+      'รัศมี ' + sess.radius + ' ม.  |  GPS พิกัดห้องเรียนถูกตั้งไว้แล้ว';
+  } catch(e) {
+    document.getElementById('sessInfoBar').textContent = 'ลิงก์ไม่ถูกต้อง';
+  }
+}
+
+function studentCheckIn() {
+  var id   = document.getElementById('stdId').value.trim();
+  var name = document.getElementById('stdName').value.trim();
+
+  if (!id)   { showToast('กรุณากรอกรหัสนิสิต');   return; }
+  if (!name) { showToast('กรุณากรอกชื่อ-นามสกุล'); return; }
+  if (!sLat) { showToast('กรุณารอรับ GPS ก่อน');   return; }
+  if (!sessionToken) { showToast('ยังไม่มี Session กรุณาสแกน QR ใหม่'); return; }
+
+  var sess;
+  try {
+    sess = decodeToken(sessionToken);
+  } catch(e) {
+    showFail('Session ไม่ถูกต้อง', 'กรุณาสแกน QR ใหม่จากอาจารย์');
+    return;
+  }
+
+  if (Date.now() > sess.exp) {
+    showFail('Session หมดอายุแล้ว', 'กรุณาขอ QR ใหม่จากอาจารย์');
+    return;
+  }
+
+  var d = calcDist(sLat, sLng, sess.lat, sess.lng);
+  if (d > sess.radius) {
+    showFail(
+      'อยู่นอกรัศมีที่กำหนด',
+      'คุณอยู่ห่างจากห้องเรียน ' + Math.round(d) + ' เมตร\n' +
+      'ระบบอนุญาตไม่เกิน ' + sess.radius + ' เมตร\n\n' +
+      'กรุณาเข้าในห้องเรียนก่อนเช็คชื่อ'
+    );
+    return;
+  }
+
+  // ── Device Fingerprint ──
+  var fp  = getFingerprint();
+  var key = 'sess_' + sess.exp;
+  var reg = {};
+  try { reg = JSON.parse(localStorage.getItem(key) || '{}'); } catch(e) {}
+
+  // รหัสนี้เคยเช็คจากเครื่องอื่น
+  if (reg[id] && reg[id] !== fp) {
+    showFail(
+      '🚨 ตรวจพบการลงชื่อแทน',
+      'รหัส ' + id + ' ได้ถูกเช็คชื่อจากอุปกรณ์อื่นแล้ว\n' +
+      'ไม่อนุญาตให้เช็คชื่อซ้ำจากอุปกรณ์นี้'
+    );
+    return;
+  }
+
+  // เครื่องนี้เคยเช็คให้คนอื่น
+  var usedFor = null;
+  var keys = Object.keys(reg);
+  for (var k = 0; k < keys.length; k++) {
+    if (keys[k] !== id && reg[keys[k]] === fp) { usedFor = keys[k]; break; }
+  }
+  if (usedFor) {
+    showFail(
+      '🚨 อุปกรณ์นี้ถูกใช้แล้ว',
+      'อุปกรณ์นี้ได้เช็คชื่อให้รหัส ' + usedFor + ' ไปแล้ว\n' +
+      '1 อุปกรณ์ต่อ 1 รหัสนิสิตต่อ session เท่านั้น'
+    );
+    return;
+  }
+
+  // ── ผ่านทุกการตรวจสอบ ──
+  reg[id] = fp;
+  try { localStorage.setItem(key, JSON.stringify(reg)); } catch(e) {}
+
+  var ts      = new Date().toLocaleTimeString('th-TH');
+  var shortFP = fp.substring(0, 6);
+
+  // บันทึกลงตาราง
+  checkins.push({ id:id, name:name, lat:sLat, lng:sLng, time:ts, fp:shortFP });
+  renderTable();
+
+  // ส่งไป Google Sheets (ใช้วันที่จากอุปกรณ์นิสิต และวิชาที่ตั้งไว้ถ้ามี)
+  var todayStr = new Date().toLocaleDateString('th-TH');
+  sendCheckin(id, name, sLat, sLng, 'present', ts, sessionSubject || 'เช็คชื่อ', sessionDateStr || todayStr);
+
+  document.getElementById('stdMain').style.display = 'none';
+  document.getElementById('stdOK').style.display   = '';
+  document.getElementById('okMsg').textContent =
+    id + '  ' + name +
+    '\nเวลา ' + ts +
+    '\nห่างจากห้องเรียน ' + Math.round(d) + ' เมตร' +
+    '\nID อุปกรณ์: #' + shortFP;
+}
+
+function showFail(title, msg) {
+  document.getElementById('stdMain').style.display  = 'none';
+  document.getElementById('stdFail').style.display  = '';
+  document.getElementById('failTitle').textContent  = title;
+  document.getElementById('failMsg').textContent    = msg;
+}
+
+function resetStudent() {
+  document.getElementById('stdMain').style.display = '';
+  document.getElementById('stdFail').style.display = 'none';
+  document.getElementById('stdOK').style.display   = 'none';
+  refreshStudentGPS();
+}
+
+// ─────────────────────────
+// Utilities
+// ─────────────────────────
+function calcDist(lat1, lng1, lat2, lng2) {
+  var R    = 6371000;
+  var dLat = (lat2 - lat1) * Math.PI / 180;
+  var dLng = (lng2 - lng1) * Math.PI / 180;
+  var a    = Math.sin(dLat/2) * Math.sin(dLat/2) +
+             Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+             Math.sin(dLng/2) * Math.sin(dLng/2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+var _toast;
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(_toast);
+  _toast = setTimeout(function() { t.classList.remove('show'); }, 2800);
+}
+
+// ─────────────────────────
+// Google Sheets
+// ─────────────────────────
+function sendCheckin(id, name, lat, lng, status, time, subj, date) {
+  var url = localStorage.getItem('scriptUrl');
+  if (!url) return;
+  fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json' },
+    body: JSON.stringify({
+      action:'checkin',
+      sheetId:  localStorage.getItem('sheetId')  || '',
+      sheetTab: localStorage.getItem('sheetTab') || 'เช็คชื่อ',
+      stdId: id, name: name,
+      lat: lat, lng: lng,
+      status: status, time: time,
+      subject: subj, date: date
+    })
+  }).catch(function() {});
+}
+
+function exportToSheet() {
+  var url = localStorage.getItem('scriptUrl');
+  if (!url) { showToast('กรุณาตั้งค่า Script URL ก่อน'); return; }
+  var rows = checkins.map(function(c) {
+    return { stdId:c.id, name:c.name, lat:c.lat, lng:c.lng, status:'present', time:c.time };
+  });
+  var subj = document.getElementById('subjectName').value;
+  var date = document.getElementById('sessionDate').value;
+  showToast('กำลังบันทึก...');
+  fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json' },
+    body: JSON.stringify({
+      action:'exportAll',
+      sheetId:  localStorage.getItem('sheetId')  || '',
+      sheetTab: localStorage.getItem('sheetTab') || 'เช็คชื่อ',
+      subject: subj, date: date, rows: rows
+    })
+  }).then(function(r) { return r.text(); })
+    .then(function() { showToast('บันทึกสำเร็จ!'); })
+    .catch(function() { showToast('เกิดข้อผิดพลาด ลองใหม่'); });
+}
+
+function exportCSV() {
+  if (checkins.length === 0) { showToast('ยังไม่มีข้อมูล'); return; }
+  var date = document.getElementById('sessionDate').value;
+  var subj = document.getElementById('subjectName').value || 'attendance';
+  var csv  = '\uFEFFลำดับ,รหัสนิสิต,ชื่อ-นามสกุล,วิชา,วันที่,ตำแหน่ง,สถานะ,เวลา\n';
+  for (var i = 0; i < checkins.length; i++) {
+    var c   = checkins[i];
+    var loc = c.lat ? c.lat.toFixed(5) + ' ' + c.lng.toFixed(5) : '-';
+    csv += (i+1) + ',"' + c.id + '","' + c.name + '","' + subj + '","' + date + '","' + loc + '",present,' + c.time + '\n';
+  }
+  var a = document.createElement('a');
+  a.href     = URL.createObjectURL(new Blob([csv], { type:'text/csv;charset=utf-8' }));
+  a.download = 'checkin_' + date + '.csv';
+  a.click();
+  showToast('Export CSV สำเร็จ');
+}
+
+// ─────────────────────────
+// Config
+// ─────────────────────────
+function saveConfig() {
+  localStorage.setItem('scriptUrl', document.getElementById('scriptUrl').value.trim());
+  localStorage.setItem('sheetId',   document.getElementById('sheetId').value.trim());
+  localStorage.setItem('sheetTab',  document.getElementById('sheetTab').value.trim());
+  showToast('บันทึกการตั้งค่าแล้ว');
+}
+
+function loadConfig() {
+  if (!localStorage.getItem('scriptUrl')) {
+    localStorage.setItem('scriptUrl', 'https://script.google.com/a/macros/go.buu.ac.th/s/AKfycbymMMsA_KfQxvbgymH4lm4Woz4AxTGrWBmbHgb-uHEqpY01hJpCJgnu6eupxDI_ryod/exec');
+    localStorage.setItem('sheetId',   'https://docs.google.com/spreadsheets/d/1FzICgPMxrcoO78LKY4sVxPhzg4TamMLAFghybQ4MtE8/edit?gid=0#gid=0');
+    localStorage.setItem('sheetTab',  'เช็คชื่อ');
+  }
+  document.getElementById('scriptUrl').value = localStorage.getItem('scriptUrl') || '';
+  document.getElementById('sheetId').value   = localStorage.getItem('sheetId')   || '';
+  document.getElementById('sheetTab').value  = localStorage.getItem('sheetTab')  || 'เช็คชื่อ';
+}
+
+function testScript() {
+  var url = localStorage.getItem('scriptUrl');
+  if (!url) { showToast('ยังไม่ได้ตั้งค่า URL'); return; }
+  showToast('กำลังทดสอบ...');
+  fetch(url + '?action=ping')
+    .then(function(r) { return r.text(); })
+    .then(function(t) { showToast('เชื่อมต่อสำเร็จ: ' + t); })
+    .catch(function() { showToast('เชื่อมต่อไม่ได้ ตรวจสอบ URL'); });
+}
+
+function copyCode() {
+  var code = document.getElementById('codeBox').textContent;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(code).then(function() { showToast('คัดลอกโค้ดแล้ว!'); });
+  } else {
+    showToast('คัดลอกไม่ได้ในเบราว์เซอร์นี้ กรุณาเลือกข้อความด้วยตนเอง');
+  }
+}
+
+// ─────────────────────────
+// Apps Script Code
+// ─────────────────────────
+function setupCodeBox() {
+  var lines = [
+    'function doPost(e) {',
+    '  var data = JSON.parse(e.postData.contents);',
+    '  var ss   = SpreadsheetApp.openById(data.sheetId);',
+    '',
+    '  // เช็คชื่อทีละคน (real-time)',
+    '  if (data.action === \'checkin\') {',
+    '    var tab  = data.sheetTab + \'_\' + data.date;',
+    '    var sheet = ss.getSheetByName(tab);',
+    '    if (!sheet) {',
+    '      sheet = ss.insertSheet(tab);',
+    '      sheet.appendRow([\'ลำดับ\',\'รหัสนิสิต\',\'ชื่อ-นามสกุล\',\'วิชา\',\'วันที่\',\'ตำแหน่ง\',\'สถานะ\',\'เวลา\']);',
+    '    }',
+    '    var loc = data.lat + \', \' + data.lng;',
+    '    sheet.appendRow([',
+    '      sheet.getLastRow(), data.stdId, data.name,',
+    '      data.subject, data.date, loc, data.status, data.time',
+    '    ]);',
+    '  }',
+    '',
+    '  // Export ทั้ง session',
+    '  if (data.action === \'exportAll\') {',
+    '    var tab2   = data.sheetTab + \'_\' + data.date;',
+    '    var sheet2 = ss.getSheetByName(tab2) || ss.insertSheet(tab2);',
+    '    sheet2.clearContents();',
+    '    sheet2.appendRow([\'ลำดับ\',\'รหัสนิสิต\',\'ชื่อ-นามสกุล\',\'วิชา\',\'วันที่\',\'ตำแหน่ง\',\'สถานะ\',\'เวลา\']);',
+    '    data.rows.forEach(function(r, i) {',
+    '      var loc2 = r.lat ? r.lat + \', \' + r.lng : \'-\';',
+    '      sheet2.appendRow([i+1, r.stdId, r.name, data.subject, data.date, loc2, r.status, r.time]);',
+    '    });',
+    '  }',
+    '',
+    '  return ContentService',
+    '    .createTextOutput(\'success\')',
+    '    .setMimeType(ContentService.MimeType.TEXT);',
+    '}',
+    '',
+    'function doGet(e) {',
+    '  return ContentService',
+    '    .createTextOutput(\'ok\')',
+    '    .setMimeType(ContentService.MimeType.TEXT);',
+    '}'
+  ];
+  document.getElementById('codeBox').textContent = lines.join('\n');
+}
+</script>
+</body>
+</html>
